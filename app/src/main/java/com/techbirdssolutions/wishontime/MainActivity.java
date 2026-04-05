@@ -6,6 +6,10 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PowerManager;
+import android.accounts.Account;
+import android.accounts.AccountManager;
+import android.app.AlertDialog;
+import android.database.Cursor;
 import android.provider.ContactsContract;
 import android.provider.Settings;
 import android.widget.*;
@@ -35,6 +39,9 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvSelectedTime;
     private RadioButton rbInclude;
 
+    private String selectedAccountName = null;
+    private String selectedAccountType = null;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         DynamicColors.applyToActivityIfAvailable(this);
@@ -59,7 +66,8 @@ public class MainActivity extends AppCompatActivity {
         permissionLauncher.launch(new String[]{
                 Manifest.permission.SEND_SMS,
                 Manifest.permission.READ_CONTACTS,
-                Manifest.permission.POST_NOTIFICATIONS
+                Manifest.permission.POST_NOTIFICATIONS,
+                Manifest.permission.GET_ACCOUNTS
         });
 
         contactPickerLauncher = registerForActivityResult(
@@ -77,6 +85,8 @@ public class MainActivity extends AppCompatActivity {
         // Navigation to About Page (Both Title and Bottom Button)
         findViewById(R.id.toolbar).setOnClickListener(v -> openAboutPage());
         findViewById(R.id.btnAboutDeveloper).setOnClickListener(v -> openAboutPage());
+
+        findViewById(R.id.btnSelectAccount).setOnClickListener(v -> showAccountPicker());
 
         RadioGroup modeGroup = findViewById(R.id.modeGroup);
         modeGroup.setOnCheckedChangeListener((group, checkedId) -> {
@@ -225,15 +235,70 @@ public class MainActivity extends AppCompatActivity {
         return new ArrayList<>(finalSet);
     }
 
+    private void showAccountPicker() {
+        AccountManager am = AccountManager.get(this);
+        Account[] accounts = am.getAccountsByType("com.google");
+        
+        if (accounts.length == 0) {
+            Toast.makeText(this, "No Google accounts found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] accountNames = new String[accounts.length + 1];
+        accountNames[0] = "All Accounts (Show Everything)";
+        for (int i = 0; i < accounts.length; i++) {
+            accountNames[i + 1] = accounts[i].name;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle("Filter by Google Account")
+                .setItems(accountNames, (dialog, which) -> {
+                    if (which == 0) {
+                        selectedAccountName = null;
+                        selectedAccountType = null;
+                        ((Button)findViewById(R.id.btnSelectAccount)).setText("All Accounts (Tap to Filter)");
+                    } else {
+                        selectedAccountName = accounts[which - 1].name;
+                        selectedAccountType = accounts[which - 1].type;
+                        ((Button)findViewById(R.id.btnSelectAccount)).setText("Filtered: " + selectedAccountName);
+                    }
+                    Toast.makeText(this, "Filter applied to 'Exclude' mode", Toast.LENGTH_SHORT).show();
+                })
+                .show();
+    }
+
     private Set<String> getAllSystemContacts() {
         Set<String> uniqueNumbers = new LinkedHashSet<>();
-        android.database.Cursor cursor = getContentResolver().query(
-                ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null, null, null, null);
+        Uri uri = ContactsContract.CommonDataKinds.Phone.CONTENT_URI;
+        
+        String selection = null;
+        String[] selectionArgs = null;
+
+        if (selectedAccountName != null) {
+            // This is a bit complex as we need to join with RawContacts to filter by account
+            // For simplicity in a basic app, we can query Data.CONTENT_URI which includes account info if we join right
+            uri = ContactsContract.Data.CONTENT_URI;
+            selection = ContactsContract.Data.MIMETYPE + "=? AND " +
+                    ContactsContract.RawContacts.ACCOUNT_NAME + "=? AND " +
+                    ContactsContract.RawContacts.ACCOUNT_TYPE + "=?";
+            selectionArgs = new String[]{
+                    ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE,
+                    selectedAccountName,
+                    selectedAccountType
+            };
+        }
+
+        Cursor cursor = getContentResolver().query(uri, null, selection, selectionArgs, null);
 
         if (cursor != null) {
-            while (cursor.moveToNext()) {
-                String num = cursor.getString(cursor.getColumnIndexOrThrow(ContactsContract.CommonDataKinds.Phone.NUMBER));
-                uniqueNumbers.add(num.replaceAll("[^0-9+]", ""));
+            int numIndex = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER);
+            if (numIndex != -1) {
+                while (cursor.moveToNext()) {
+                    String num = cursor.getString(numIndex);
+                    if (num != null) {
+                        uniqueNumbers.add(num.replaceAll("[^0-9+]", ""));
+                    }
+                }
             }
             cursor.close();
         }

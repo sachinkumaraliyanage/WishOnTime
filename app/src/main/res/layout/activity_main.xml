@@ -133,6 +133,14 @@
                         android:text="Recipients"
                         android:textAppearance="@style/TextAppearance.Material3.TitleMedium" />
 
+                    <Button
+                        android:id="@+id/btnSelectAccount"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="All Accounts (Tap to Filter)"
+                        app:icon="@android:drawable/ic_menu_myplaces" />
+
                     <RadioGroup
                         android:id="@+id/modeGroup"
                         android:layout_width="match_parent"
