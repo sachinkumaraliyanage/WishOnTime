@@ -46,4 +46,4 @@ Connect with me:
 
 ## 📄 License
 
-This project is developed by TechBird Solutions. All rights reserved.
+This project is developed by TechBird Solutions. MIT License.
