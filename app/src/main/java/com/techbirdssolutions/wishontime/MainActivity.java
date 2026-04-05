@@ -19,6 +19,9 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.color.DynamicColors;
+import android.text.Editable;
+import android.text.TextWatcher;
+import com.google.android.material.textfield.TextInputLayout;
 import com.google.android.material.timepicker.MaterialTimePicker;
 import com.google.android.material.timepicker.TimeFormat;
 import java.text.SimpleDateFormat;
@@ -79,10 +82,26 @@ public class MainActivity extends AppCompatActivity {
 
         findViewById(R.id.btnPickTime).setOnClickListener(v -> showTimePicker());
         findViewById(R.id.btnAddContact).setOnClickListener(v -> pickContact());
+
+        TextInputLayout tilMessage = findViewById(R.id.tilMessage);
+        EditText etMessage = findViewById(R.id.etMessage);
+
+        etMessage.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                updateSmsCounter(s.toString(), tilMessage);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
         findViewById(R.id.btnStart).setOnClickListener(v -> scheduleSmsTask());
         findViewById(R.id.btnStop).setOnClickListener(v -> stopSchedule());
         
-        // Navigation to About Page (Both Title and Bottom Button)
+        // Navigation to About Page
         findViewById(R.id.toolbar).setOnClickListener(v -> openAboutPage());
         findViewById(R.id.btnAboutDeveloper).setOnClickListener(v -> openAboutPage());
 
@@ -303,6 +322,23 @@ public class MainActivity extends AppCompatActivity {
             cursor.close();
         }
         return uniqueNumbers;
+    }
+
+    private void updateSmsCounter(String message, TextInputLayout til) {
+        if (message.isEmpty()) {
+            til.setHelperText("SMS 1: 0/160");
+            return;
+        }
+        int length = message.length();
+        int smsCount = (length + 159) / 160;
+        int remainingInCurrent = 160 - (length % 160);
+        if (length % 160 == 0 && length > 0) remainingInCurrent = 0;
+        
+        String helper = "SMS " + smsCount + ": " + (160 - remainingInCurrent) + "/160";
+        if (smsCount > 1) {
+            helper += " (Total Parts: " + smsCount + ")";
+        }
+        til.setHelperText(helper);
     }
 
     private void stopSchedule() {
